@@ -1,67 +1,79 @@
 export default async function handler(req, res) {
   const VERIFY_TOKEN = "ritesh-whatsapp-verify";
-  const N8N_WEBHOOK =
-    "https://ritesh24.app.n8n.cloud/webhook/whatsapp-documents";
 
-  // ======================================
-  // META WEBHOOK VERIFICATION
-  // ======================================
+  // ===========================
+  // META VERIFICATION
+  // ===========================
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    console.log("========== META VERIFICATION ==========");
-    console.log(req.query);
-
     if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("Webhook verified successfully.");
       return res.status(200).send(challenge);
     }
 
-    console.log("Verification failed.");
-    return res.status(403).send("Verification failed");
+    // For browser testing
+    return res.status(200).send("Webhook is running");
   }
 
-  // ======================================
-  // RECEIVE WHATSAPP EVENT
-  // ======================================
+  // ===========================
+  // TEST PAYLOAD
+  // ===========================
   if (req.method === "POST") {
     try {
-      console.log("========== WHATSAPP EVENT ==========");
-      console.log(JSON.stringify(req.body, null, 2));
-
-      // Payload sent to n8n
       const payload = {
         source: "vercel",
         receivedAt: new Date().toISOString(),
-        whatsapp: req.body,
+        whatsapp: {
+          entry: [
+            {
+              changes: [
+                {
+                  value: {
+                    messages: [
+                      {
+                        from: "919999999999",
+                        type: "document",
+                        document: {
+                          id: "MEDIA123456",
+                          filename: "invoice.pdf",
+                          mime_type: "application/pdf"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
       };
 
-      console.log("========== FORWARDING TO N8N ==========");
-      console.log(JSON.stringify(payload, null, 2));
+      const response = await fetch(
+        "https://ritesh24.app.n8n.cloud/webhook-test/whatsapp-documents",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        }
+      );
 
-      const response = await fetch(N8N_WEBHOOK, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+      const text = await response.text();
+
+      return res.status(200).json({
+        success: true,
+        n8nStatus: response.status,
+        n8nResponse: text
       });
 
-      const responseText = await response.text();
-
-      console.log("========== N8N RESPONSE ==========");
-      console.log("Status:", response.status);
-      console.log(responseText);
-
-      return res.status(200).send("EVENT_RECEIVED");
-    } catch (err) {
-      console.error("========== ERROR ==========");
-      console.error(err);
-
-      // Always return 200 to Meta
-      return res.status(200).send("EVENT_RECEIVED");
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   }
 
