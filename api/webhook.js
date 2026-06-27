@@ -1,8 +1,10 @@
 export default async function handler(req, res) {
   const VERIFY_TOKEN = "ritesh-whatsapp-verify";
+  const N8N_WEBHOOK =
+    "https://ritesh24.app.n8n.cloud/webhook/whatsapp-documents";
 
   // ===========================
-  // META VERIFICATION
+  // META WEBHOOK VERIFICATION
   // ===========================
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
@@ -13,67 +15,42 @@ export default async function handler(req, res) {
       return res.status(200).send(challenge);
     }
 
-    // For browser testing
-    return res.status(200).send("Webhook is running");
+    return res.status(403).send("Verification failed");
   }
 
   // ===========================
-  // TEST PAYLOAD
+  // RECEIVE REAL WHATSAPP EVENTS
   // ===========================
   if (req.method === "POST") {
     try {
+      console.log("Incoming WhatsApp payload:");
+      console.log(JSON.stringify(req.body, null, 2));
+
       const payload = {
         source: "vercel",
         receivedAt: new Date().toISOString(),
-        whatsapp: {
-          entry: [
-            {
-              changes: [
-                {
-                  value: {
-                    messages: [
-                      {
-                        from: "919999999999",
-                        type: "document",
-                        document: {
-                          id: "MEDIA123456",
-                          filename: "invoice.pdf",
-                          mime_type: "application/pdf"
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          ]
-        }
+        whatsapp: req.body,
       };
 
-      const response = await fetch(
-        "https://ritesh24.app.n8n.cloud/webhook-test/whatsapp-documents",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      const text = await response.text();
-
-      return res.status(200).json({
-        success: true,
-        n8nStatus: response.status,
-        n8nResponse: text
+      const response = await fetch(N8N_WEBHOOK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       });
 
+      const responseText = await response.text();
+
+      console.log("n8n Response:", response.status, responseText);
+
+      // Meta requires HTTP 200
+      return res.status(200).send("EVENT_RECEIVED");
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        error: error.message
-      });
+      console.error(error);
+
+      // Always return 200 to Meta
+      return res.status(200).send("EVENT_RECEIVED");
     }
   }
 
