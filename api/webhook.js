@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const VERIFY_TOKEN = "whatsapp2026verify";
+  const VERIFY_TOKEN = "ritesh-whatsapp-verify";
 
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
